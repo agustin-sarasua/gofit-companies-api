@@ -1,18 +1,24 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Companies API CloudFromation template
 Parameters:
-  ResourcePrefix:
+  prefix:
     Type: String
-    Description: Resource prefix to use when creating necessary objects
-    AllowedPattern: '^[a-z0-9][a-z0-9-]+$'
-    ConstraintDescription: 'Resource prefix can only contain lower-case letters, numbers, and dashes'
+    Default: "gofit"
+    Description: "Resource prefix to use when creating necessary objects"
+    AllowedPattern: "^[a-z0-9][a-z0-9-]+$"
+    ConstraintDescription: "Resource prefix can only contain lower-case letters, numbers, and dashes"
     MaxLength: 30
+  envParameter: 
+    Type: String
+    Default: dev
+    AllowedValues: [ dev, test, qa, prod ]
+    Description: Suffix to be added for names.
 Resources:
   ApiGatewayRestApi:
     Type: 'AWS::ApiGateway::RestApi'
     Properties:
       Description: The API resource
-      Name: !Ref ResourcePrefix
+      Name: !Ref prefix
   ApiGatewayResource:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
@@ -56,7 +62,7 @@ Resources:
     Type: 'AWS::Lambda::Function'
     Properties:
       Code:
-        S3Bucket: gofit-lambda-functions
+        S3Bucket: !Sub ${prefix}-lambda-functions
         S3Key: companies-lambda.zip
       Handler: main
       MemorySize: 128
@@ -96,6 +102,38 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName:
+            'Fn::Join':
+              - '-'
+              - - Ref: 'AWS::StackName'
+                - UseDBPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:DeleteItem'
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:Query'
+                  - 'dynamodb:Scan'
+                  - 'dynamodb:UpdateItem'
+                Resource:
+                  'Fn::Join':
+                    - ''
+                    - - 'arn:aws:dynamodb:'
+                      - Ref: 'AWS::Region'
+                      - ':'
+                      - Ref: 'AWS::AccountId'
+                      - ':table/'
+                      - Ref: companiesTable
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
   ApiGatewayAuthorizer:
     Type: 'AWS::ApiGateway::Authorizer'
     Properties:
@@ -134,6 +172,27 @@ Resources:
               - Effect: Allow
                 Action: 'lambda:invokeFunction'
                 Resource: !ImportValue gofit-custom-authorizer-lambda
+  companiesTable: 
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "UserSub"
+          AttributeType: "S"
+        - 
+          AttributeName: "CompanyID"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "UserSub"
+          KeyType: "HASH"
+        - 
+          AttributeName: "CompanyID"
+          KeyType: "RANGE"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      TableName: "Companies"
   
 Outputs:
   AwsAccountId:

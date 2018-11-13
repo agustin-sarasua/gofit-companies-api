@@ -4,5 +4,8 @@ zip -j /tmp/companies-lambda.zip /tmp/main
 aws s3 cp /tmp/companies-lambda.zip s3://gofit-lambda-functions/
 
 cd ../custom-authorizer-lambda
-zip -j /tmp/api-gateway-authorizer.zip api-gateway-authorizer.py
+zip -r /tmp/api-gateway-authorizer.zip api-gateway-authorizer.py
 aws s3 cp /tmp/api-gateway-authorizer.zip s3://gofit-lambda-functions/
+
+aws lambda update-function-code --function-name gofit-companies-stack-CustomAuthorizerLambda-19S0U86ODKMX7 \
+--s3-bucket gofit-lambda-functions --s3-key api-gateway-authorizer.zip
