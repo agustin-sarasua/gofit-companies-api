@@ -28,13 +28,12 @@ func getClaimsSub(ctx events.APIGatewayProxyRequestContext) string {
 	if err != nil {
 		fmt.Printf("Something went wrong %v", err)
 	}
-	fmt.Printf("Printing sub: %s ", r["principalId"].(string))
 	return r["principalId"].(string)
 }
 
 func createCompany(c *gin.Context) {
 	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
-	e := Company{}
+	e := Company{Rol: RolOwner}
 
 	err := c.BindJSON(&e)
 	if err != nil {
@@ -54,14 +53,62 @@ func createCompany(c *gin.Context) {
 		return
 	}
 	e.UserSub = getClaimsSub(apiGwContext)
-	err = putItem(&e)
+	e.Status = StatusActive
+	err = putCompany(&e)
 	if err != nil {
 		fmt.Printf("Error saving item in db %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": err.Error(),
 		})
 	}
-	c.JSON(http.StatusAccepted, e)
+	c.JSON(http.StatusCreated, e)
+}
+
+// TODO validate if the company exists and if the UserSub is the owner of it.
+// Send push notification to Staff to accept being Staff
+// Once accepted he is added
+func createStaff(c *gin.Context) {
+	companyID := c.Param("id")
+	e := Staff{}
+	err := c.BindJSON(&e)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+		})
+	}
+	if e.Rol == "" {
+		e.Rol = RolStaff
+	}
+	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
+	// TODO validate UserSub exists
+	e.CreatedBy = getClaimsSub(apiGwContext)
+	e.Status = StatusPending
+	e.CompanyID = companyID
+	err = putStaff(&e)
+	if err != nil {
+		fmt.Printf("Error saving item in db %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": err.Error(),
+		})
+	}
+	c.JSON(http.StatusCreated, e)
+}
+
+func listCompanies(c *gin.Context) {
+	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
+	userSub := getClaimsSub(apiGwContext)
+	cs, err := getUserCompanies(userSub, 10)
+	if err != nil {
+		fmt.Printf("Error saving item in db %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": err.Error(),
+		})
+	}
+	log.Printf("Length of cs %d", len(cs))
+
+	c.JSON(http.StatusOK, &struct {
+		Companies []*Company `json:"Companies"`
+	}{Companies: cs})
 }
 
 // Handler is the main entry point for Lambda. Receives a proxy request and
@@ -71,8 +118,9 @@ func Handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		// stdout and stderr are sent to AWS CloudWatch Logs
 		log.Printf("Gin cold start")
 		r := gin.Default()
-		// r.GET("/companies", listCompanies)
+		r.GET("/companies", listCompanies)
 		r.POST("/companies", createCompany)
+		r.POST("/companies/:id/staff", createStaff)
 
 		ginLambda = ginadapter.New(r)
 	}

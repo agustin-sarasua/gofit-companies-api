@@ -19,7 +19,8 @@ Resources:
     Properties:
       Description: The API resource
       Name: !Ref prefix
-  ApiGatewayResource:
+  
+  ApiGatewayCompaniesResource:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
@@ -27,14 +28,52 @@ Resources:
         - ApiGatewayRestApi
         - RootResourceId
       PathPart: companies
-  ApiGatewayPostMethod:
+  ApiGatewayCompanyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref ApiGatewayCompaniesResource
+      PathPart: "{companyId}"
+
+  ApiGatewayStaffResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref ApiGatewayCompanyResource
+      PathPart: staff
+
+  ApiGatewayGetCompaniesMethod:
     Type: 'AWS::ApiGateway::Method'
     DependsOn: LambdaPermission
     Properties:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref ApiGatewayAuthorizer
       RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref ApiGatewayResource
+      ResourceId: !Ref ApiGatewayCompaniesResource
+      HttpMethod: GET
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Join 
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref 'AWS::Region'
+            - ':lambda:path/2015-03-31/functions/'
+            - !GetAtt 
+              - Lambda
+              - Arn
+            - /invocations
+      RequestParameters:
+        method.request.header.Authorization: true
+
+  ApiGatewayPostCompanyMethod:
+    Type: 'AWS::ApiGateway::Method'
+    DependsOn: LambdaPermission
+    Properties:
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiGatewayAuthorizer
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayCompaniesResource
       HttpMethod: POST
       Integration:
         Type: AWS_PROXY
@@ -50,9 +89,36 @@ Resources:
             - /invocations
       RequestParameters:
         method.request.header.Authorization: true
+
+  ApiGatewayPostStaffMethod:
+    Type: 'AWS::ApiGateway::Method'
+    DependsOn: LambdaPermission
+    Properties:
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiGatewayAuthorizer
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayStaffResource
+      HttpMethod: POST
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Join 
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref 'AWS::Region'
+            - ':lambda:path/2015-03-31/functions/'
+            - !GetAtt 
+              - Lambda
+              - Arn
+            - /invocations
+      RequestParameters:
+        method.request.header.Authorization: true
+
   ApiGatewatDeployment:
     DependsOn:
-      - ApiGatewayPostMethod
+      - ApiGatewayPostCompanyMethod
+      - ApiGatewayGetCompaniesMethod
+      - ApiGatewayPostStaffMethod
     Type: 'AWS::ApiGateway::Deployment'
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
@@ -61,6 +127,7 @@ Resources:
   Lambda:
     Type: 'AWS::Lambda::Function'
     Properties:
+      FunctionName: gofit-companies-api,
       Code:
         S3Bucket: !Sub ${prefix}-lambda-functions
         S3Key: companies-lambda.zip
@@ -182,6 +249,9 @@ Resources:
         - 
           AttributeName: "CompanyID"
           AttributeType: "S"
+        - 
+          AttributeName: "Rol"
+          AttributeType: "S"
       KeySchema: 
         - 
           AttributeName: "UserSub"
@@ -193,6 +263,33 @@ Resources:
         ReadCapacityUnits: "5"
         WriteCapacityUnits: "5"
       TableName: "Companies"
+      GlobalSecondaryIndexes: 
+        - 
+          IndexName: "companiesGSI"
+          KeySchema: 
+            - 
+              AttributeName: "CompanyID"
+              KeyType: "HASH"
+            - 
+              AttributeName: "UserSub"
+              KeyType: "RANGE"
+          Projection: 
+            ProjectionType: "ALL"
+          ProvisionedThroughput: 
+            ReadCapacityUnits: "5"
+            WriteCapacityUnits: "5"
+      LocalSecondaryIndexes: 
+        - 
+          IndexName: "rolLSI"
+          KeySchema: 
+            - 
+              AttributeName: "UserSub"
+              KeyType: "HASH"
+            - 
+              AttributeName: "Rol"
+              KeyType: "RANGE"
+          Projection: 
+            ProjectionType: "ALL"
   
 Outputs:
   AwsAccountId:
