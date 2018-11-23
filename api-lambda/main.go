@@ -111,6 +111,18 @@ func listCompanies(c *gin.Context) {
 	}{Companies: cs})
 }
 
+func getCompanyData(c *gin.Context) {
+	companyID := c.Param("id")
+	co, err := getCompanyWithStaff(companyID, 100)
+	if err != nil {
+		fmt.Printf("Error saving item in db %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": err.Error(),
+		})
+	}
+	c.JSON(http.StatusOK, co)
+}
+
 // Handler is the main entry point for Lambda. Receives a proxy request and
 // returns a proxy response
 func Handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -119,6 +131,7 @@ func Handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		log.Printf("Gin cold start")
 		r := gin.Default()
 		r.GET("/companies", listCompanies)
+		r.GET("/companies/:id", getCompanyData)
 		r.POST("/companies", createCompany)
 		r.POST("/companies/:id/staff", createStaff)
 

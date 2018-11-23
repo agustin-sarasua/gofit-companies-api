@@ -59,10 +59,49 @@ func putStaff(s *Staff) error {
 }
 
 func getUserCompanies(userSub string, limit int64) ([]*Company, error) {
-	log.Printf("Loading user companies for %s", userSub)
+	log.Printf("Loading user companies for %s \n", userSub)
 
 	// Construct the Key condition builder
 	keyCond := expression.Key("UserSub").Equal(expression.Value(userSub))
+
+	// Construct the filter builder with a name and value.
+	// filt := expression.Name("DocType").Equal(expression.Value("Company"))
+
+	// Using the filter and projections create a DynamoDB expression from the two.
+	expr, err := expression.NewBuilder().
+		WithKeyCondition(keyCond).
+		// WithFilter(filt).
+		Build()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Prepare the input for the query.
+	input := &dynamodb.QueryInput{
+		TableName: aws.String(tableName),
+		Limit:     &limit,
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		KeyConditionExpression:    expr.KeyCondition(),
+	}
+
+	resp, err := db.Query(input)
+	if err == nil {
+		fmt.Println(resp)
+		ps := []*Company{}
+		err = dynamodbattribute.UnmarshalListOfMaps(resp.Items, &ps)
+		log.Printf("Response count %d", *resp.Count)
+		return ps, nil
+	}
+	log.Printf("Error %s", err.Error())
+	return nil, err
+}
+
+func getCompanyWithStaff(companyID string, limit int64) (*Company, error) {
+	log.Printf("Loading company data for %s \n", companyID)
+
+	// Construct the Key condition builder
+	keyCond := expression.Key("CompanyID").Equal(expression.Value(companyID))
 
 	// Construct the filter builder with a name and value.
 	filt := expression.Name("DocType").Equal(expression.Value("Company"))
@@ -79,58 +118,31 @@ func getUserCompanies(userSub string, limit int64) ([]*Company, error) {
 	// Prepare the input for the query.
 	input := &dynamodb.QueryInput{
 		TableName: aws.String(tableName),
+		IndexName: aws.String(companiesGSI),
 		Limit:     &limit,
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		KeyConditionExpression:    expr.KeyCondition(),
 		FilterExpression:          expr.Filter(),
 	}
-
 	resp, err := db.Query(input)
-	if err == nil {
-		fmt.Println(resp)
-		ps := []*Company{}
-		err = dynamodbattribute.UnmarshalListOfMaps(resp.Items, &ps)
-		log.Printf("Response count %d", *resp.Count)
-		return ps, nil
-	}
-	log.Printf("Error %s", err.Error())
-	return nil, err
-}
-
-func getCompanyWithStaff(companyID string, limit int64) (*Company, error) {
-
-	// Prepare the input for the query.
-	input := &dynamodb.QueryInput{
-		TableName: aws.String(tableName),
-		IndexName: &companiesGSI,
-		Limit:     &limit,
-		KeyConditions: map[string]*dynamodb.Condition{
-			"CompanyID": {
-				ComparisonOperator: aws.String("EQ"),
-				AttributeValueList: []*dynamodb.AttributeValue{
-					{
-						S: aws.String(companyID),
-					},
-				},
-			},
-		},
-	}
-	var resp, err = db.Query(input)
 	if err == nil {
 		var company Company
 		ss := []*Staff{}
 		// err = dynamodbattribute.UnmarshalListOfMaps(resp.Items, &ps)
 		for _, m := range resp.Items {
 			if t, ok := m["DocType"]; ok {
-				if t.GoString() == "Company" {
+				if *t.S == "Company" {
 					err = dynamodbattribute.UnmarshalMap(m, &company)
-				} else if t.GoString() == "Staff" {
+				} else if *t.S == "Staff" {
 					c := Staff{}
 					err = dynamodbattribute.UnmarshalMap(m, &c)
+					c.CompanyID = ""
 					if err == nil {
 						ss = append(ss, &c)
 					}
+				} else {
+					log.Print(m)
 				}
 			}
 		}

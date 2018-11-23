@@ -4,7 +4,7 @@ zip -j /tmp/companies-lambda.zip /tmp/main
 
 aws s3 cp /tmp/companies-lambda.zip s3://gofit-lambda-functions/
 
-aws lambda update-function-code --function-name gofit-companies-stack-Lambda-LY75WETBCIX \
+aws lambda update-function-code --function-name gofit-companies-stack-Lambda-L0NV2RT7FI88 \
 --s3-bucket gofit-lambda-functions --s3-key companies-lambda.zip
 
 cd ../custom-authorizer-lambda

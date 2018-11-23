@@ -42,6 +42,30 @@ Resources:
       ParentId: !Ref ApiGatewayCompanyResource
       PathPart: staff
 
+  ApiGatewayGetCompanyMethod:
+    Type: 'AWS::ApiGateway::Method'
+    DependsOn: LambdaPermission
+    Properties:
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiGatewayAuthorizer
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayCompanyResource
+      HttpMethod: GET
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Join 
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref 'AWS::Region'
+            - ':lambda:path/2015-03-31/functions/'
+            - !GetAtt 
+              - Lambda
+              - Arn
+            - /invocations
+      RequestParameters:
+        method.request.header.Authorization: true
+
   ApiGatewayGetCompaniesMethod:
     Type: 'AWS::ApiGateway::Method'
     DependsOn: LambdaPermission
@@ -117,6 +141,7 @@ Resources:
   ApiGatewatDeployment:
     DependsOn:
       - ApiGatewayPostCompanyMethod
+      - ApiGatewayGetCompanyMethod
       - ApiGatewayGetCompaniesMethod
       - ApiGatewayPostStaffMethod
     Type: 'AWS::ApiGateway::Deployment'
