@@ -104,12 +104,12 @@ func getCompanyWithStaff(companyID string, limit int64) (*Company, error) {
 	keyCond := expression.Key("CompanyID").Equal(expression.Value(companyID))
 
 	// Construct the filter builder with a name and value.
-	filt := expression.Name("DocType").Equal(expression.Value("Company"))
+	//filt := expression.Name("DocType").Equal(expression.Value("Company"))
 
 	// Using the filter and projections create a DynamoDB expression from the two.
 	expr, err := expression.NewBuilder().
 		WithKeyCondition(keyCond).
-		WithFilter(filt).
+		//WithFilter(filt).
 		Build()
 	if err != nil {
 		fmt.Println(err)
