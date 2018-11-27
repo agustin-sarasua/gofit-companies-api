@@ -14,12 +14,54 @@ Parameters:
     AllowedValues: [ dev, test, qa, prod ]
     Description: Suffix to be added for names.
 Resources:
+  # RestApi, authorizer and authorizer rol
   ApiGatewayRestApi:
     Type: 'AWS::ApiGateway::RestApi'
     Properties:
       Description: The API resource
       Name: gofit-companies-api
   
+  ApiGatewayAuthorizer:
+    Type: 'AWS::ApiGateway::Authorizer'
+    Properties:
+      AuthorizerCredentials: !GetAtt 
+        - ApiGatewayAuthorizerRole
+        - Arn
+      AuthorizerResultTtlInSeconds: 300
+      AuthorizerUri: !Join 
+        - ''
+        - - 'arn:aws:apigateway:'
+          - !Ref 'AWS::Region'
+          - ':lambda:path/2015-03-31/functions/'
+          - !ImportValue gofit-custom-authorizer-lambda
+          - /invocations
+      IdentitySource: method.request.header.Authorization
+      Name: api-authorizer
+      RestApiId: !Ref ApiGatewayRestApi
+      Type: TOKEN
+
+  ApiGatewayAuthorizerRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: lambda
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'lambda:invokeFunction'
+                Resource: !ImportValue gofit-custom-authorizer-lambda
+  
+  # /companies Resource
   ApiGatewayCompaniesResource:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
@@ -28,6 +70,8 @@ Resources:
         - ApiGatewayRestApi
         - RootResourceId
       PathPart: companies
+  
+  # /companies/{companyId} Resource
   ApiGatewayCompanyResource:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
@@ -35,6 +79,7 @@ Resources:
       ParentId: !Ref ApiGatewayCompaniesResource
       PathPart: "{companyId}"
 
+  # /companies/{companyId}/staff Resource
   ApiGatewayStaffResource:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
@@ -42,9 +87,10 @@ Resources:
       ParentId: !Ref ApiGatewayCompanyResource
       PathPart: staff
 
+  # GET /companies/{companyID}
   ApiGatewayGetCompanyMethod:
     Type: 'AWS::ApiGateway::Method'
-    DependsOn: LambdaPermission
+    DependsOn: ApiGatewayLambdaPermission
     Properties:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref ApiGatewayAuthorizer
@@ -66,9 +112,10 @@ Resources:
       RequestParameters:
         method.request.header.Authorization: true
 
+  # GET /companies
   ApiGatewayGetCompaniesMethod:
     Type: 'AWS::ApiGateway::Method'
-    DependsOn: LambdaPermission
+    DependsOn: ApiGatewayLambdaPermission
     Properties:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref ApiGatewayAuthorizer
@@ -89,10 +136,11 @@ Resources:
             - /invocations
       RequestParameters:
         method.request.header.Authorization: true
-
+  
+  # POST /companies
   ApiGatewayPostCompanyMethod:
     Type: 'AWS::ApiGateway::Method'
-    DependsOn: LambdaPermission
+    DependsOn: ApiGatewayLambdaPermission
     Properties:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref ApiGatewayAuthorizer
@@ -114,9 +162,10 @@ Resources:
       RequestParameters:
         method.request.header.Authorization: true
 
+  # POST /companies/{companyID}/staff
   ApiGatewayPostStaffMethod:
     Type: 'AWS::ApiGateway::Method'
-    DependsOn: LambdaPermission
+    DependsOn: ApiGatewayLambdaPermission
     Properties:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref ApiGatewayAuthorizer
@@ -138,6 +187,7 @@ Resources:
       RequestParameters:
         method.request.header.Authorization: true
 
+  # Deployment of Development Stage
   ApiGatewatDeployment:
     DependsOn:
       - ApiGatewayPostCompanyMethod
@@ -149,21 +199,9 @@ Resources:
       RestApiId: !Ref ApiGatewayRestApi
       Description: Development Stage
       StageName: Development
-  Lambda:
-    Type: 'AWS::Lambda::Function'
-    Properties:
-      FunctionName: GoFitCompaniesApi
-      Code:
-        S3Bucket: !Sub ${prefix}-lambda-functions
-        S3Key: companies-lambda.zip
-      Handler: main
-      MemorySize: 128
-      Role: !GetAtt 
-        - LambdaRole
-        - Arn
-      Runtime: go1.x
-      Timeout: 60
-  LambdaPermission:
+  
+  # Lambda Permission: Gives permition to the api gateway to excecute the Lambda Function
+  ApiGatewayLambdaPermission:
     Type: 'AWS::Lambda::Permission'
     Properties:
       Action: 'lambda:invokeFunction'
@@ -180,6 +218,23 @@ Resources:
           - ':'
           - !Ref ApiGatewayRestApi
           - /*
+
+  # Lambda backend (golang lambda)
+  Lambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: GoFitCompaniesApi
+      Code:
+        S3Bucket: !Sub ${prefix}-lambda-functions
+        S3Key: companies-lambda.zip
+      Handler: main
+      MemorySize: 128
+      Role: !GetAtt 
+        - LambdaRole
+        - Arn
+      Runtime: go1.x
+      Timeout: 60
+  # Lambda Rol: The rol associated to the Lambda function
   LambdaRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -258,63 +313,27 @@ Resources:
                   - 'logs:CreateLogStream'
                   - 'logs:PutLogEvents'
                 Resource: '*'
-  ApiGatewayAuthorizer:
-    Type: 'AWS::ApiGateway::Authorizer'
-    Properties:
-      AuthorizerCredentials: !GetAtt 
-        - ApiGatewayAuthorizerRole
-        - Arn
-      AuthorizerResultTtlInSeconds: 300
-      AuthorizerUri: !Join 
-        - ''
-        - - 'arn:aws:apigateway:'
-          - !Ref 'AWS::Region'
-          - ':lambda:path/2015-03-31/functions/'
-          - !ImportValue gofit-custom-authorizer-lambda
-          - /invocations
-      IdentitySource: method.request.header.Authorization
-      Name: api-authorizer
-      RestApiId: !Ref ApiGatewayRestApi
-      Type: TOKEN
-  ApiGatewayAuthorizerRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - apigateway.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      Policies:
-        - PolicyName: lambda
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action: 'lambda:invokeFunction'
-                Resource: !ImportValue gofit-custom-authorizer-lambda
+  
+  # Database DynamoDB
   companiesTable: 
     Type: AWS::DynamoDB::Table
     Properties: 
       AttributeDefinitions: 
         - 
-          AttributeName: "UserSub"
-          AttributeType: "S"
-        - 
           AttributeName: "CompanyID"
           AttributeType: "S"
         - 
-          AttributeName: "Rol"
+          AttributeName: "SortKey"
+          AttributeType: "S"
+        - 
+          AttributeName: "UserSub"
           AttributeType: "S"
       KeySchema: 
         - 
-          AttributeName: "UserSub"
+          AttributeName: "CompanyID"
           KeyType: "HASH"
         - 
-          AttributeName: "CompanyID"
+          AttributeName: "SortKey"
           KeyType: "RANGE"
       ProvisionedThroughput: 
         ReadCapacityUnits: "5"
@@ -322,31 +341,19 @@ Resources:
       TableName: "Companies"
       GlobalSecondaryIndexes: 
         - 
-          IndexName: "companiesGSI"
+          IndexName: "companiesUserSubGSI"
           KeySchema: 
             - 
-              AttributeName: "CompanyID"
+              AttributeName: "UserSub"
               KeyType: "HASH"
             - 
-              AttributeName: "UserSub"
+              AttributeName: "SortKey"
               KeyType: "RANGE"
           Projection: 
             ProjectionType: "ALL"
           ProvisionedThroughput: 
             ReadCapacityUnits: "5"
             WriteCapacityUnits: "5"
-      LocalSecondaryIndexes: 
-        - 
-          IndexName: "rolLSI"
-          KeySchema: 
-            - 
-              AttributeName: "UserSub"
-              KeyType: "HASH"
-            - 
-              AttributeName: "Rol"
-              KeyType: "RANGE"
-          Projection: 
-            ProjectionType: "ALL"
   
 Outputs:
   AwsAccountId:

@@ -1,13 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/agustin-sarasua/gofit-companies-api/model"
+	"github.com/agustin-sarasua/gofit-companies-api/util"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/gin"
@@ -20,20 +21,9 @@ var ginLambda *ginadapter.GinLambda
 var errorLogger = log.New(os.Stderr, "ERROR ", log.Llongfile)
 var infoLogger = log.New(os.Stdout, "INFO ", log.Llongfile)
 
-func getClaimsSub(ctx events.APIGatewayProxyRequestContext) string {
-	jc, _ := json.Marshal(ctx.Authorizer)
-	fmt.Print(string(jc))
-	r := make(map[string]interface{})
-	err := json.Unmarshal(jc, &r)
-	if err != nil {
-		fmt.Printf("Something went wrong %v", err)
-	}
-	return r["principalId"].(string)
-}
-
 func createCompany(c *gin.Context) {
 	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
-	e := Company{Rol: RolOwner}
+	e := model.Company{Rol: model.RolOwner}
 
 	err := c.BindJSON(&e)
 	if err != nil {
@@ -52,8 +42,11 @@ func createCompany(c *gin.Context) {
 		})
 		return
 	}
-	e.UserSub = getClaimsSub(apiGwContext)
-	e.Status = StatusActive
+	e.UserSub = util.GetClaimsSub(apiGwContext)
+	e.Status = model.StatusActive
+	e.SortKey = fmt.Sprintf("company-%s", e.ID)
+	e.Staff = nil
+
 	err = putCompany(&e)
 	if err != nil {
 		fmt.Printf("Error saving item in db %v", err)
@@ -69,7 +62,11 @@ func createCompany(c *gin.Context) {
 // Once accepted he is added
 func createStaff(c *gin.Context) {
 	companyID := c.Param("id")
-	e := Staff{}
+	e := model.Staff{}
+
+	uid, _ := uuid.NewV4()
+	e.ID = uid.String()
+
 	err := c.BindJSON(&e)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -77,13 +74,14 @@ func createStaff(c *gin.Context) {
 		})
 	}
 	if e.Rol == "" {
-		e.Rol = RolStaff
+		e.Rol = model.RolStaff
 	}
 	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
 	// TODO validate UserSub exists
-	e.CreatedBy = getClaimsSub(apiGwContext)
-	e.Status = StatusPending
+	e.CreatedBy = util.GetClaimsSub(apiGwContext)
+	e.Status = model.StatusPending
 	e.CompanyID = companyID
+	e.SortKey = fmt.Sprintf("staff-%s", e.ID)
 	err = putStaff(&e)
 	if err != nil {
 		fmt.Printf("Error saving item in db %v", err)
@@ -96,7 +94,7 @@ func createStaff(c *gin.Context) {
 
 func listCompanies(c *gin.Context) {
 	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
-	userSub := getClaimsSub(apiGwContext)
+	userSub := util.GetClaimsSub(apiGwContext)
 	cs, err := getUserCompanies(userSub, 10)
 	if err != nil {
 		fmt.Printf("Error saving item in db %v", err)
@@ -107,8 +105,20 @@ func listCompanies(c *gin.Context) {
 	log.Printf("Length of cs %d", len(cs))
 
 	c.JSON(http.StatusOK, &struct {
-		Companies []*Company `json:"Companies"`
+		Companies []*model.Company `json:"Companies"`
 	}{Companies: cs})
+}
+
+func deleteCompany(c *gin.Context) {
+	companyID := c.Param("id")
+	co, err := getCompanyWithStaff(companyID, 100)
+	if err != nil {
+		fmt.Printf("Error deleting company %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": err.Error(),
+		})
+	}
+	c.JSON(http.StatusOK, co)
 }
 
 func getCompanyData(c *gin.Context) {
@@ -130,6 +140,7 @@ func Handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		// stdout and stderr are sent to AWS CloudWatch Logs
 		log.Printf("Gin cold start")
 		r := gin.Default()
+		r.DELETE("/companies/:id", deleteCompany)
 		r.GET("/companies", listCompanies)
 		r.GET("/companies/:id", getCompanyData)
 		r.POST("/companies", createCompany)

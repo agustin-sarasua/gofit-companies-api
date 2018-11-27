@@ -3,7 +3,6 @@ package main
 import (
 	"testing"
 
-	"github.com/agustin-sarasua/gofit-companies-api/util"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +24,7 @@ func TestGetCompanyData(t *testing.T) {
 	}{
 		{
 			setUp: func() {
-				dbMock := &util.MockDynamoDBClient{}
+				dbMock := &mockDynamoDBClient{}
 				db = dbMock
 				items := make([]map[string]*dynamodb.AttributeValue, 0)
 				items = append(items, map[string]*dynamodb.AttributeValue{
@@ -83,7 +82,7 @@ func TestListCompanies(t *testing.T) {
 	}{
 		{
 			setUp: func() {
-				dbMock := &util.MockDynamoDBClient{}
+				dbMock := &mockDynamoDBClient{}
 				db = dbMock
 				items := make([]map[string]*dynamodb.AttributeValue, 0)
 				items = append(items, map[string]*dynamodb.AttributeValue{
