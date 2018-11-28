@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/agustin-sarasua/gofit-companies-api/model"
+	"github.com/agustin-sarasua/gofit-companies-api/util"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -21,38 +22,18 @@ var companiesUserSubGSI = "companiesUserSubGSI"
 // use.
 var db dynamodbiface.DynamoDBAPI = dynamodb.New(session.New(), aws.NewConfig().WithRegion("us-east-1"))
 
-func addType(av map[string]*dynamodb.AttributeValue, itype string) {
-	av["DocType"] = &dynamodb.AttributeValue{
-		S: aws.String(itype),
-	}
-}
-
 func putCompany(e *model.Company) error {
 	av, err := dynamodbattribute.MarshalMap(e)
 	if err != nil {
 		panic(fmt.Sprintf("failed to DynamoDB marshal Record, %v", err))
 	}
-	addType(av, "Company")
+	util.AddType(av, model.CompanyDocType)
 
 	input := &dynamodb.PutItemInput{
 		TableName: aws.String(tableName),
 		Item:      av,
 	}
 
-	_, err = db.PutItem(input)
-	return err
-}
-
-func putStaff(s *model.Staff) error {
-	av, err := dynamodbattribute.MarshalMap(s)
-	addType(av, "Staff")
-	if err != nil {
-		panic(fmt.Sprintf("failed to DynamoDB marshal Record, %v", err))
-	}
-	input := &dynamodb.PutItemInput{
-		TableName: aws.String(tableName),
-		Item:      av,
-	}
 	_, err = db.PutItem(input)
 	return err
 }
@@ -127,27 +108,37 @@ func getCompanyWithStaff(companyID string, limit int64) (*model.Company, error) 
 	resp, err := db.Query(input)
 	if err == nil {
 		var company model.Company
-		ss := []*model.Staff{}
+		compStaff := make([]*model.Staff, 0)
+		compServices := make([]*model.CompanyService, 0)
 		// err = dynamodbattribute.UnmarshalListOfMaps(resp.Items, &ps)
 		for _, m := range resp.Items {
 			if t, ok := m["DocType"]; ok {
-				if *t.S == "Company" {
+				if *t.S == model.CompanyDocType {
 					err = dynamodbattribute.UnmarshalMap(m, &company)
 					company.SortKey = ""
-				} else if *t.S == "Staff" {
+				} else if *t.S == model.StaffDocType {
 					c := model.Staff{}
 					err = dynamodbattribute.UnmarshalMap(m, &c)
 					c.SortKey = ""
 					c.CompanyID = ""
 					if err == nil {
-						ss = append(ss, &c)
+						compStaff = append(compStaff, &c)
+					}
+				} else if *t.S == model.ServiceDocType {
+					c := model.CompanyService{}
+					err = dynamodbattribute.UnmarshalMap(m, &c)
+					c.SortKey = ""
+					c.CompanyID = ""
+					if err == nil {
+						compServices = append(compServices, &c)
 					}
 				} else {
 					log.Print(m)
 				}
 			}
 		}
-		company.Staff = ss
+		company.Staff = compStaff
+		company.Services = compServices
 		return &company, nil
 	}
 	return nil, err

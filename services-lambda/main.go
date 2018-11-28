@@ -56,7 +56,7 @@ func Handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		// stdout and stderr are sent to AWS CloudWatch Logs
 		log.Printf("Gin cold start")
 		r := gin.Default()
-		r.POST("/companies/:id/service", createCompanyService)
+		r.POST("/companies/:id/services", createCompanyService)
 
 		ginLambda = ginadapter.New(r)
 	}

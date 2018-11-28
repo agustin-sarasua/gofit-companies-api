@@ -1,12 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/agustin-sarasua/gofit-companies-api/model"
+	"github.com/agustin-sarasua/gofit-companies-api/util"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/gin"
@@ -18,23 +19,12 @@ var ginLambda *ginadapter.GinLambda
 var errorLogger = log.New(os.Stderr, "ERROR ", log.Llongfile)
 var infoLogger = log.New(os.Stdout, "INFO ", log.Llongfile)
 
-func getClaimsSub(ctx events.APIGatewayProxyRequestContext) string {
-	jc, _ := json.Marshal(ctx.Authorizer)
-	fmt.Print(string(jc))
-	r := make(map[string]interface{})
-	err := json.Unmarshal(jc, &r)
-	if err != nil {
-		fmt.Printf("Something went wrong %v", err)
-	}
-	return r["principalId"].(string)
-}
-
 // TODO validate if the company exists and if the UserSub is the owner of it.
 // Send push notification to Staff to accept being Staff
 // Once accepted he is added
 func createStaff(c *gin.Context) {
 	companyID := c.Param("id")
-	e := Staff{}
+	e := model.Staff{}
 	err := c.BindJSON(&e)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -42,12 +32,12 @@ func createStaff(c *gin.Context) {
 		})
 	}
 	if e.Rol == "" {
-		e.Rol = RolStaff
+		e.Rol = model.RolStaff
 	}
 	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
 	// TODO validate UserSub exists
-	e.CreatedBy = getClaimsSub(apiGwContext)
-	e.Status = StatusPending
+	e.CreatedBy = util.GetClaimsSub(apiGwContext)
+	e.Status = model.StatusPending
 	e.CompanyID = companyID
 	e.SortKey = fmt.Sprintf("staff-%s", e.UserSub)
 	err = putStaff(&e)

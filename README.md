@@ -6,7 +6,14 @@ Package and Deploy the lambdas
 2. Custom Authorizer Lambda
 
 
-DynamoDB Table
+DynamoDB Companies Table
+
+¿How this table will be accesed?
+User 
+ - Get his companies and the information related to it (staff, services, etc.)
+    - This is why we have a GSI by UserSub
+ 
+
 
 - Composite key: Partition Key + Range Key
 

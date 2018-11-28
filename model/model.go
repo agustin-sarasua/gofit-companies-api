@@ -10,6 +10,10 @@ const (
 	StatusConfirmed string = "CONFIRMED"
 	StatusActive    string = "ACTIVE"
 	StatusInactive  string = "INACTIVE"
+
+	StaffDocType   = "Staff"
+	ServiceDocType = "Service"
+	CompanyDocType = "Company"
 )
 
 type Company struct {

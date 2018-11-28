@@ -57,41 +57,6 @@ func createCompany(c *gin.Context) {
 	c.JSON(http.StatusCreated, e)
 }
 
-// TODO validate if the company exists and if the UserSub is the owner of it.
-// Send push notification to Staff to accept being Staff
-// Once accepted he is added
-func createStaff(c *gin.Context) {
-	companyID := c.Param("id")
-	e := model.Staff{}
-
-	uid, _ := uuid.NewV4()
-	e.ID = uid.String()
-
-	err := c.BindJSON(&e)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
-	}
-	if e.Rol == "" {
-		e.Rol = model.RolStaff
-	}
-	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
-	// TODO validate UserSub exists
-	e.CreatedBy = util.GetClaimsSub(apiGwContext)
-	e.Status = model.StatusPending
-	e.CompanyID = companyID
-	e.SortKey = fmt.Sprintf("staff-%s", e.ID)
-	err = putStaff(&e)
-	if err != nil {
-		fmt.Printf("Error saving item in db %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
-	}
-	c.JSON(http.StatusCreated, e)
-}
-
 func listCompanies(c *gin.Context) {
 	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
 	userSub := util.GetClaimsSub(apiGwContext)
@@ -144,7 +109,6 @@ func Handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		r.GET("/companies", listCompanies)
 		r.GET("/companies/:id", getCompanyData)
 		r.POST("/companies", createCompany)
-		r.POST("/companies/:id/staff", createStaff)
 
 		ginLambda = ginadapter.New(r)
 	}

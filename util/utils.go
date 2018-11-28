@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 func GetClaimsSub(ctx events.APIGatewayProxyRequestContext) string {
@@ -16,4 +18,10 @@ func GetClaimsSub(ctx events.APIGatewayProxyRequestContext) string {
 		fmt.Printf("Something went wrong %v", err)
 	}
 	return r["principalId"].(string)
+}
+
+func AddType(av map[string]*dynamodb.AttributeValue, itype string) {
+	av["DocType"] = &dynamodb.AttributeValue{
+		S: aws.String(itype),
+	}
 }

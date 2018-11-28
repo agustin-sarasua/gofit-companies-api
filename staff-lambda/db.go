@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 
+	"github.com/agustin-sarasua/gofit-companies-api/model"
+	"github.com/agustin-sarasua/gofit-companies-api/util"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -18,15 +20,9 @@ var companiesUserSubGSI = "companiesUserSubGSI"
 // use.
 var db dynamodbiface.DynamoDBAPI = dynamodb.New(session.New(), aws.NewConfig().WithRegion("us-east-1"))
 
-func addType(av map[string]*dynamodb.AttributeValue, itype string) {
-	av["DocType"] = &dynamodb.AttributeValue{
-		S: aws.String(itype),
-	}
-}
-
-func putStaff(s *Staff) error {
+func putStaff(s *model.Staff) error {
 	av, err := dynamodbattribute.MarshalMap(s)
-	addType(av, "Staff")
+	util.AddType(av, model.StaffDocType)
 	if err != nil {
 		panic(fmt.Sprintf("failed to DynamoDB marshal Record, %v", err))
 	}

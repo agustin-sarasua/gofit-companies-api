@@ -87,10 +87,19 @@ Resources:
       ParentId: !Ref ApiGatewayCompanyResource
       PathPart: staff
 
+  # /companies/{companyId}/services Resource
+  ApiGatewayCompanyServicesResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref ApiGatewayCompanyResource
+      PathPart: services
+
+
   # GET /companies/{companyID}
   ApiGatewayGetCompanyMethod:
     Type: 'AWS::ApiGateway::Method'
-    DependsOn: ApiGatewayLambdaPermission
+    DependsOn: LambdaPermission
     Properties:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref ApiGatewayAuthorizer
@@ -115,7 +124,7 @@ Resources:
   # GET /companies
   ApiGatewayGetCompaniesMethod:
     Type: 'AWS::ApiGateway::Method'
-    DependsOn: ApiGatewayLambdaPermission
+    DependsOn: LambdaPermission
     Properties:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref ApiGatewayAuthorizer
@@ -140,7 +149,7 @@ Resources:
   # POST /companies
   ApiGatewayPostCompanyMethod:
     Type: 'AWS::ApiGateway::Method'
-    DependsOn: ApiGatewayLambdaPermission
+    DependsOn: LambdaPermission
     Properties:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref ApiGatewayAuthorizer
@@ -165,7 +174,7 @@ Resources:
   # POST /companies/{companyID}/staff
   ApiGatewayPostStaffMethod:
     Type: 'AWS::ApiGateway::Method'
-    DependsOn: ApiGatewayLambdaPermission
+    DependsOn: CompanyStaffLambdaPermission
     Properties:
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref ApiGatewayAuthorizer
@@ -181,7 +190,32 @@ Resources:
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
             - !GetAtt 
-              - Lambda
+              - CompanyStaffLambda
+              - Arn
+            - /invocations
+      RequestParameters:
+        method.request.header.Authorization: true
+  
+  # POST /companies/{companyID}/services
+  ApiGatewayPostCompanyServiceMethod:
+    Type: 'AWS::ApiGateway::Method'
+    DependsOn: CompanyServicesLambdaPermission
+    Properties:
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiGatewayAuthorizer
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayCompanyServicesResource
+      HttpMethod: POST
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Join 
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref 'AWS::Region'
+            - ':lambda:path/2015-03-31/functions/'
+            - !GetAtt 
+              - CompanyServicesLambda
               - Arn
             - /invocations
       RequestParameters:
@@ -194,6 +228,7 @@ Resources:
       - ApiGatewayGetCompanyMethod
       - ApiGatewayGetCompaniesMethod
       - ApiGatewayPostStaffMethod
+      - ApiGatewayPostCompanyServiceMethod
     Type: 'AWS::ApiGateway::Deployment'
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
@@ -201,12 +236,49 @@ Resources:
       StageName: Development
   
   # Lambda Permission: Gives permition to the api gateway to excecute the Lambda Function
-  ApiGatewayLambdaPermission:
+  LambdaPermission:
     Type: 'AWS::Lambda::Permission'
     Properties:
       Action: 'lambda:invokeFunction'
       FunctionName: !GetAtt 
         - Lambda
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join 
+        - ''
+        - - 'arn:aws:execute-api:'
+          - !Ref 'AWS::Region'
+          - ':'
+          - !Ref 'AWS::AccountId'
+          - ':'
+          - !Ref ApiGatewayRestApi
+          - /*
+  # CompanyServicesLambda Permission: Gives permition to the api gateway to excecute the CompanyServicesLambda Function
+  CompanyServicesLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:invokeFunction'
+      FunctionName: !GetAtt 
+        - CompanyServicesLambda
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join 
+        - ''
+        - - 'arn:aws:execute-api:'
+          - !Ref 'AWS::Region'
+          - ':'
+          - !Ref 'AWS::AccountId'
+          - ':'
+          - !Ref ApiGatewayRestApi
+          - /*
+
+  # CompanyServicesLambda Permission: Gives permition to the api gateway to excecute the CompanyServicesLambda Function
+  CompanyStaffLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:invokeFunction'
+      FunctionName: !GetAtt 
+        - CompanyStaffLambda
         - Arn
       Principal: apigateway.amazonaws.com
       SourceArn: !Join 
@@ -234,6 +306,39 @@ Resources:
         - Arn
       Runtime: go1.x
       Timeout: 60
+  
+  # CompanyServices backend (golang lambda)
+  CompanyServicesLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: GoFitCompanyServicesApi
+      Code:
+        S3Bucket: !Sub ${prefix}-lambda-functions
+        S3Key: company-services-lambda.zip
+      Handler: main
+      MemorySize: 128
+      Role: !GetAtt 
+        - LambdaRole
+        - Arn
+      Runtime: go1.x
+      Timeout: 60
+  
+  # CompanyStaffLambda backend (golang lambda)
+  CompanyStaffLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: GoFitCompanyStaffApi
+      Code:
+        S3Bucket: !Sub ${prefix}-lambda-functions
+        S3Key: company-staff-lambda.zip
+      Handler: main
+      MemorySize: 128
+      Role: !GetAtt 
+        - LambdaRole
+        - Arn
+      Runtime: go1.x
+      Timeout: 60
+
   # Lambda Rol: The rol associated to the Lambda function
   LambdaRole:
     Type: 'AWS::IAM::Role'
