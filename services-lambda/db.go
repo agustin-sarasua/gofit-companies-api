@@ -28,14 +28,14 @@ func putCompanyService(s *model.CompanyService) error {
 
 	// [Service-{uuid}] | [Service-{uuid}] | ...
 	avEntity, err := dynamodbattribute.MarshalMap(s)
-	util.AddType(avEntity, model.ServiceDocType)
-	partitionKey := fmt.Sprintf("%s-%s", model.ServiceDocType, s.ID)
+	util.AddType(avEntity, model.DocTypeService)
+	partitionKey := fmt.Sprintf("%s-%s", model.DocTypeService, s.ID)
 	util.AddDyanmoDBKeys(avEntity, partitionKey, partitionKey)
 
 	// [Company-{uuid}] | [Service-{uuid}] | ...
 	avCompanyService, err := dynamodbattribute.MarshalMap(s)
-	util.AddType(avCompanyService, model.ServiceDocType)
-	sortKey := fmt.Sprintf("%s-%s", model.CompanyDocType, s.CompanyID)
+	util.AddType(avCompanyService, model.DocTypeService)
+	sortKey := fmt.Sprintf("%s-%s", model.DocTypeCompany, s.CompanyID)
 	util.AddDyanmoDBKeys(avCompanyService, sortKey, partitionKey)
 
 	input := &dynamodb.BatchWriteItemInput{

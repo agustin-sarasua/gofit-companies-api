@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/gin"
 	"github.com/gin-gonic/gin"
-	uuid "github.com/satori/go.uuid"
 )
 
 var ginLambda *ginadapter.GinLambda
@@ -22,22 +21,16 @@ var infoLogger = log.New(os.Stdout, "INFO ", log.Llongfile)
 
 func createCompanyService(c *gin.Context) {
 	companyID := c.Param("id")
-	e := model.CompanyService{}
-	uid, _ := uuid.NewV4()
-	e.ID = uid.String()
-
+	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
+	userSub := util.GetClaimsSub(apiGwContext)
+	e := model.NewCompanyService(companyID, userSub)
 	err := c.BindJSON(&e)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": err.Error(),
 		})
 	}
-	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
-	e.UserSub = util.GetClaimsSub(apiGwContext)
-
 	// TODO validate UserSub exists
-	e.Status = model.StatusActive
-	e.CompanyID = companyID
 	err = putCompanyService(&e)
 	if err != nil {
 		fmt.Printf("Error saving item in db %v", err)

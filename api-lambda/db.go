@@ -27,8 +27,8 @@ func putCompany(e *model.Company) error {
 	if err != nil {
 		panic(fmt.Sprintf("failed to DynamoDB marshal Record, %v", err))
 	}
-	util.AddType(av, model.CompanyDocType)
-	partitionKey := fmt.Sprintf("%s-%s", model.CompanyDocType, e.ID)
+	util.AddType(av, model.DocTypeCompany)
+	partitionKey := fmt.Sprintf("%s-%s", model.DocTypeCompany, e.ID)
 	util.AddDyanmoDBKeys(av, partitionKey, partitionKey)
 
 	input := &dynamodb.PutItemInput{
@@ -46,7 +46,7 @@ func getUserCompanies(userSub string, limit int64) ([]*model.Company, error) {
 	// Construct the Key condition builder
 	keyCond := expression.Key("UserSub").
 		Equal(expression.Value(userSub)).
-		And(expression.KeyBeginsWith(expression.Key("SortKey"), fmt.Sprintf("%s-", model.CompanyDocType)))
+		And(expression.KeyBeginsWith(expression.Key("SortKey"), fmt.Sprintf("%s-", model.DocTypeCompany)))
 
 	// Construct the filter builder with a name and value.
 	//filt := expression.Name("DocType").Equal(expression.Value("Company"))
@@ -86,7 +86,7 @@ func loadCompanyData(companyID string, limit int64) (*model.Company, error) {
 	log.Printf("Loading company data for %s \n", companyID)
 
 	// Construct the Key condition builder
-	keyCond := expression.Key("PartitionKey").Equal(expression.Value(fmt.Sprintf("%s-%s", model.CompanyDocType, companyID)))
+	keyCond := expression.Key("PartitionKey").Equal(expression.Value(fmt.Sprintf("%s-%s", model.DocTypeCompany, companyID)))
 
 	// Construct the filter builder with a name and value.
 	//filt := expression.Name("DocType").Equal(expression.Value("Company"))
@@ -117,16 +117,16 @@ func loadCompanyData(companyID string, limit int64) (*model.Company, error) {
 		// err = dynamodbattribute.UnmarshalListOfMaps(resp.Items, &ps)
 		for _, m := range resp.Items {
 			if t, ok := m["DocType"]; ok {
-				if *t.S == model.CompanyDocType {
+				if *t.S == model.DocTypeCompany {
 					err = dynamodbattribute.UnmarshalMap(m, &company)
-				} else if *t.S == model.StaffDocType {
+				} else if *t.S == model.DocTypeStaff {
 					c := model.Staff{}
 					err = dynamodbattribute.UnmarshalMap(m, &c)
 					c.CompanyID = ""
 					if err == nil {
 						compStaff = append(compStaff, &c)
 					}
-				} else if *t.S == model.ServiceDocType {
+				} else if *t.S == model.DocTypeService {
 					c := model.CompanyService{}
 					err = dynamodbattribute.UnmarshalMap(m, &c)
 					c.CompanyID = ""

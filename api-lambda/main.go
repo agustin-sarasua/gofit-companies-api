@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/agustin-sarasua/gofit-companies-api/model"
 	"github.com/agustin-sarasua/gofit-companies-api/util"
@@ -13,7 +12,6 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/gin"
 	"github.com/gin-gonic/gin"
-	uuid "github.com/satori/go.uuid"
 )
 
 var ginLambda *ginadapter.GinLambda
@@ -23,7 +21,8 @@ var infoLogger = log.New(os.Stdout, "INFO ", log.Llongfile)
 
 func createCompany(c *gin.Context) {
 	apiGwContext, _ := ginLambda.GetAPIGatewayContext(c.Request)
-	e := model.Company{Rol: model.RolOwner}
+	userSub := util.GetClaimsSub(apiGwContext)
+	e := model.NewCompany(userSub)
 
 	err := c.BindJSON(&e)
 	if err != nil {
@@ -31,21 +30,12 @@ func createCompany(c *gin.Context) {
 			"message": err.Error(),
 		})
 	}
-	uid, _ := uuid.NewV4()
-	e.ID = uid.String()
-
-	startTime := time.Now().Format("2006-01-02T15:04:05")
-	e.Timestamp = startTime
 	if e.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Name not found",
 		})
 		return
 	}
-	e.UserSub = util.GetClaimsSub(apiGwContext)
-	e.Status = model.StatusActive
-	e.Staff = nil
-
 	err = putCompany(&e)
 	if err != nil {
 		fmt.Printf("Error saving item in db %v", err)

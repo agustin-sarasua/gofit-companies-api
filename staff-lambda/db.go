@@ -25,14 +25,14 @@ func putStaff(s *model.Staff) error {
 
 	// [Staff-{uuid}] | [Staff-{uuid}] | ...
 	avEntity, err := dynamodbattribute.MarshalMap(s)
-	util.AddType(avEntity, model.StaffDocType)
-	staffKey := fmt.Sprintf("%s-%s", model.StaffDocType, s.ID)
+	util.AddType(avEntity, model.DocTypeStaff)
+	staffKey := fmt.Sprintf("%s-%s", model.DocTypeStaff, s.ID)
 	util.AddDyanmoDBKeys(avEntity, staffKey, staffKey)
 
 	// [Company-{uuid}] | [Staff-{uuid}] | ...
 	avCompanyStaff, err := dynamodbattribute.MarshalMap(s)
-	util.AddType(avCompanyStaff, model.StaffDocType)
-	partitionKey := fmt.Sprintf("%s-%s", model.CompanyDocType, s.CompanyID)
+	util.AddType(avCompanyStaff, model.DocTypeStaff)
+	partitionKey := fmt.Sprintf("%s-%s", model.DocTypeCompany, s.CompanyID)
 	util.AddDyanmoDBKeys(avCompanyStaff, partitionKey, staffKey)
 
 	input := &dynamodb.BatchWriteItemInput{
