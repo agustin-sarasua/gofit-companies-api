@@ -28,6 +28,8 @@ func putCompany(e *model.Company) error {
 		panic(fmt.Sprintf("failed to DynamoDB marshal Record, %v", err))
 	}
 	util.AddType(av, model.CompanyDocType)
+	partitionKey := fmt.Sprintf("%s-%s", model.CompanyDocType, e.ID)
+	util.AddDyanmoDBKeys(av, partitionKey, partitionKey)
 
 	input := &dynamodb.PutItemInput{
 		TableName: aws.String(tableName),
@@ -42,7 +44,9 @@ func getUserCompanies(userSub string, limit int64) ([]*model.Company, error) {
 	log.Printf("Loading user companies for %s \n", userSub)
 
 	// Construct the Key condition builder
-	keyCond := expression.Key("UserSub").Equal(expression.Value(userSub)).And(expression.KeyBeginsWith(expression.Key("SortKey"), "company-"))
+	keyCond := expression.Key("UserSub").
+		Equal(expression.Value(userSub)).
+		And(expression.KeyBeginsWith(expression.Key("SortKey"), fmt.Sprintf("%s-", model.CompanyDocType)))
 
 	// Construct the filter builder with a name and value.
 	//filt := expression.Name("DocType").Equal(expression.Value("Company"))
@@ -78,11 +82,11 @@ func getUserCompanies(userSub string, limit int64) ([]*model.Company, error) {
 	return nil, err
 }
 
-func getCompanyWithStaff(companyID string, limit int64) (*model.Company, error) {
+func loadCompanyData(companyID string, limit int64) (*model.Company, error) {
 	log.Printf("Loading company data for %s \n", companyID)
 
 	// Construct the Key condition builder
-	keyCond := expression.Key("CompanyID").Equal(expression.Value(companyID))
+	keyCond := expression.Key("PartitionKey").Equal(expression.Value(fmt.Sprintf("%s-%s", model.CompanyDocType, companyID)))
 
 	// Construct the filter builder with a name and value.
 	//filt := expression.Name("DocType").Equal(expression.Value("Company"))
@@ -115,11 +119,9 @@ func getCompanyWithStaff(companyID string, limit int64) (*model.Company, error) 
 			if t, ok := m["DocType"]; ok {
 				if *t.S == model.CompanyDocType {
 					err = dynamodbattribute.UnmarshalMap(m, &company)
-					company.SortKey = ""
 				} else if *t.S == model.StaffDocType {
 					c := model.Staff{}
 					err = dynamodbattribute.UnmarshalMap(m, &c)
-					c.SortKey = ""
 					c.CompanyID = ""
 					if err == nil {
 						compStaff = append(compStaff, &c)
@@ -127,7 +129,6 @@ func getCompanyWithStaff(companyID string, limit int64) (*model.Company, error) 
 				} else if *t.S == model.ServiceDocType {
 					c := model.CompanyService{}
 					err = dynamodbattribute.UnmarshalMap(m, &c)
-					c.SortKey = ""
 					c.CompanyID = ""
 					if err == nil {
 						compServices = append(compServices, &c)

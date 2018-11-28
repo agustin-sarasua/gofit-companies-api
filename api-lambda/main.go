@@ -44,7 +44,6 @@ func createCompany(c *gin.Context) {
 	}
 	e.UserSub = util.GetClaimsSub(apiGwContext)
 	e.Status = model.StatusActive
-	e.SortKey = fmt.Sprintf("company-%s", e.ID)
 	e.Staff = nil
 
 	err = putCompany(&e)
@@ -74,21 +73,9 @@ func listCompanies(c *gin.Context) {
 	}{Companies: cs})
 }
 
-func deleteCompany(c *gin.Context) {
-	companyID := c.Param("id")
-	co, err := getCompanyWithStaff(companyID, 100)
-	if err != nil {
-		fmt.Printf("Error deleting company %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
-	}
-	c.JSON(http.StatusOK, co)
-}
-
 func getCompanyData(c *gin.Context) {
 	companyID := c.Param("id")
-	co, err := getCompanyWithStaff(companyID, 100)
+	co, err := loadCompanyData(companyID, 100)
 	if err != nil {
 		fmt.Printf("Error saving item in db %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -105,7 +92,6 @@ func Handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		// stdout and stderr are sent to AWS CloudWatch Logs
 		log.Printf("Gin cold start")
 		r := gin.Default()
-		r.DELETE("/companies/:id", deleteCompany)
 		r.GET("/companies", listCompanies)
 		r.GET("/companies/:id", getCompanyData)
 		r.POST("/companies", createCompany)

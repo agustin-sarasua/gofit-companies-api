@@ -25,3 +25,12 @@ func AddType(av map[string]*dynamodb.AttributeValue, itype string) {
 		S: aws.String(itype),
 	}
 }
+
+func AddDyanmoDBKeys(av map[string]*dynamodb.AttributeValue, partitionKey string, rangeKey string) {
+	av["PartitionKey"] = &dynamodb.AttributeValue{
+		S: aws.String(partitionKey),
+	}
+	av["SortKey"] = &dynamodb.AttributeValue{
+		S: aws.String(rangeKey),
+	}
+}

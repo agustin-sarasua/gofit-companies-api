@@ -371,6 +371,7 @@ Resources:
                   - 'dynamodb:Query'
                   - 'dynamodb:Scan'
                   - 'dynamodb:UpdateItem'
+                  - 'dynamodb:BatchWriteItem'
                 Resource:
                   'Fn::Join':
                     - ''
@@ -402,6 +403,7 @@ Resources:
                   - 'dynamodb:Query'
                   - 'dynamodb:Scan'
                   - 'dynamodb:UpdateItem'
+                  - 'dynamodb:BatchWriteItem'
                 Resource:
                   'Fn::Join':
                     - ''
@@ -425,7 +427,7 @@ Resources:
     Properties: 
       AttributeDefinitions: 
         - 
-          AttributeName: "CompanyID"
+          AttributeName: "PartitionKey"
           AttributeType: "S"
         - 
           AttributeName: "SortKey"
@@ -435,7 +437,7 @@ Resources:
           AttributeType: "S"
       KeySchema: 
         - 
-          AttributeName: "CompanyID"
+          AttributeName: "PartitionKey"
           KeyType: "HASH"
         - 
           AttributeName: "SortKey"

@@ -36,9 +36,8 @@ func createCompanyService(c *gin.Context) {
 	e.UserSub = util.GetClaimsSub(apiGwContext)
 
 	// TODO validate UserSub exists
-	e.Status = model.StatusPending
+	e.Status = model.StatusActive
 	e.CompanyID = companyID
-	e.SortKey = fmt.Sprintf("service-%s", e.ID)
 	err = putCompanyService(&e)
 	if err != nil {
 		fmt.Printf("Error saving item in db %v", err)
